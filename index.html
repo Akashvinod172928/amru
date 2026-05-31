@@ -1391,7 +1391,7 @@ button{
             </div>
 
             <button class="btn primary" type="submit">Submit Details</button>
-            <span class="modal-note">Your details stay on this page until a backend or form service is connected.</span>
+            <span class="modal-note">Details are processed securely for private access.</span>
         </form>
 
         <div class="form-success" role="status" aria-live="polite"></div>
@@ -1492,6 +1492,18 @@ window.addEventListener("keydown", (event) => {
     }
 });
 
+// Google Forms Integration Configuration
+// -------------------------------------------------------------------------
+// INSTRUCTIONS:
+// 1. Replace "YOUR_FORM_ID" with your actual Google Form ID (from your Google Form edit URL).
+// 2. Replace "entry.xxxxxxxx" with your specific form field input entry IDs
+//    (you can find these in the HTML source of your Google Form by searching for "entry.").
+const GOOGLE_FORM_ID = "YOUR_FORM_ID";
+const NAME_FIELD_ID = "entry.xxxxxxxx";
+const PLACE_FIELD_ID = "entry.xxxxxxxx";
+const CONTACT_FIELD_ID = "entry.xxxxxxxx";
+// -------------------------------------------------------------------------
+
 privateForm?.addEventListener("submit", (event) => {
     event.preventDefault();
 
@@ -1504,17 +1516,82 @@ privateForm?.addEventListener("submit", (event) => {
         return;
     }
 
-    successMessage.textContent =
-    `Thank you, ${name}. Your private list request from ${place} has been noted.`;
-    successMessage.classList.add("is-visible");
+    // Disable submit button and show loading state
+    const submitBtn = privateForm.querySelector('button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Submitting...";
+    }
 
-    wishlistButton.textContent = "Request Noted";
-    wishlistButton.classList.add("primary");
-    toast?.classList.add("is-visible");
+    // Hide any previous messages
+    successMessage.textContent = "";
+    successMessage.classList.remove("is-visible");
+    successMessage.style.borderColor = "";
+    successMessage.style.backgroundColor = "";
 
-    window.setTimeout(() => {
-        toast?.classList.remove("is-visible");
-    }, 2800);
+    // Build URL-encoded form data parameters
+    const formParams = new URLSearchParams();
+    formParams.append(NAME_FIELD_ID, name);
+    formParams.append(PLACE_FIELD_ID, place);
+    formParams.append(CONTACT_FIELD_ID, contact);
+
+    const googleFormUrl = `https://docs.google.com/forms/d/e/${GOOGLE_FORM_ID}/formResponse`;
+
+    // Submit to Google Forms using Fetch API (with mode: 'no-cors' to bypass CORS restrictions)
+    fetch(googleFormUrl, {
+        method: "POST",
+        mode: "no-cors",
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: formParams.toString()
+    })
+    .then(() => {
+        // Successful submission (no-cors mode resolves successfully on transmit)
+        successMessage.textContent = "Thank you. Your AMRU private access request has been received.";
+        successMessage.classList.add("is-visible");
+
+        // Update target button status
+        if (wishlistButton) {
+            wishlistButton.textContent = "Access Requested";
+            wishlistButton.classList.add("primary");
+        }
+
+        // Show toast confirmation
+        toast?.classList.add("is-visible");
+        window.setTimeout(() => {
+            toast?.classList.remove("is-visible");
+        }, 2800);
+
+        // Reset inputs and fields
+        privateForm.reset();
+
+        // Close modal after a short delay
+        window.setTimeout(() => {
+            closeModal();
+            // Reset button state and message for subsequent requests
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Submit Details";
+            }
+            successMessage.classList.remove("is-visible");
+            successMessage.textContent = "";
+        }, 1800);
+    })
+    .catch((error) => {
+        // Error handling in case of failure
+        console.error("AMRU Google Forms submission error:", error);
+        successMessage.textContent = "Something went wrong. Please try again.";
+        successMessage.style.borderColor = "var(--red)";
+        successMessage.style.backgroundColor = "rgba(240, 20, 45, 0.15)";
+        successMessage.classList.add("is-visible");
+
+        // Re-enable button so user can try again
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Submit Details";
+        }
+    });
 });
 
 localLinks.forEach((link) => {
